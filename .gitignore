@@ -6,3 +6,6 @@
 !Makefile
 !*.md
 !trabalho1
+
+build/
+bin/
