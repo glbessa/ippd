@@ -7,7 +7,7 @@ SRC_OMP_DIR = src/omp
 
 BIN_DIR = bin
 
-.PHONY: all seq omp run plot clean
+.PHONY: all seq omp run plot clean task-d
 
 all: seq omp
 
@@ -33,6 +33,11 @@ run: omp
 # Gera gráficos a partir do CSV (usa plot.py)
 plot:
 	python plot.py
+
+task-d: $(BIN_DIR)/task_d
+
+$(BIN_DIR)/task_d: task-d.c | $(BIN_DIR)
+	$(CC) $(CFLAGS_OMP) $< -o $@
 
 clean:
 	rm -rf results plots
