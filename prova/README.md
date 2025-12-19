@@ -1,0 +1,1 @@
+# Paralelização com k-NN de 1D
