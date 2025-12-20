@@ -1,4 +1,5 @@
 // Experimento de overhead OpenMP: duas regioes parallel for ingênuas vs uma região parallel arrumada englobando dois for.
+#include <math.h>
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,6 +56,15 @@ static double executa_arrumada(double *vetor_a, double *vetor_b, size_t n_elemen
 	return t_fim - t_inicio;
 }
 
+static double desvio_padrao(const double *amostras, int n, double media) {
+	double soma_quadrados = 0.0;
+	for (int i = 0; i < n; i++) {
+		double diff = amostras[i] - media;
+		soma_quadrados += diff * diff;
+	}
+	return sqrt(soma_quadrados / n);
+}
+
 int main(int argc, char **argv) {
 	size_t n_elementos = 1000000UL;
 	int repeticoes = 5;
@@ -81,10 +91,14 @@ int main(int argc, char **argv) {
 
 	double *vetor_a = (double *)malloc(n_elementos * sizeof(double));
 	double *vetor_b = (double *)malloc(n_elementos * sizeof(double));
+	double *tempos_ingenua = (double *)malloc(repeticoes * sizeof(double));
+	double *tempos_arrumada = (double *)malloc(repeticoes * sizeof(double));
 	if (!vetor_a || !vetor_b) {
 		fprintf(stderr, "Erro ao alocar vetores.\n");
 		free(vetor_a);
 		free(vetor_b);
+		free(tempos_ingenua);
+		free(tempos_arrumada);
 		return 1;
 	}
 
@@ -98,18 +112,29 @@ int main(int argc, char **argv) {
 
 	for (int r = 0; r < repeticoes; r++) {
 		inicializa_entrada(vetor_a, vetor_b, n_elementos);
-		total_ingenua += executa_ingenua(vetor_a, vetor_b, n_elementos);
+		double tempo_ingenua = executa_ingenua(vetor_a, vetor_b, n_elementos);
+		tempos_ingenua[r] = tempo_ingenua;
+		total_ingenua += tempo_ingenua;
 		ultima_soma = soma_verificacao(vetor_b, n_elementos);
 
 		inicializa_entrada(vetor_a, vetor_b, n_elementos);
-		total_arrumada += executa_arrumada(vetor_a, vetor_b, n_elementos);
+		double tempo_arrumada = executa_arrumada(vetor_a, vetor_b, n_elementos);
+		tempos_arrumada[r] = tempo_arrumada;
+		total_arrumada += tempo_arrumada;
 	}
 
-	printf("variant,n,threads,reps,avg_time_sec,checksum\n");
-	printf("naive,%zu,%d,%d,%.6f,%.6f\n", n_elementos, num_threads, repeticoes, total_ingenua / repeticoes, ultima_soma);
-	printf("tidy,%zu,%d,%d,%.6f,%.6f\n", n_elementos, num_threads, repeticoes, total_arrumada / repeticoes, ultima_soma);
+	double media_ingenua = total_ingenua / repeticoes;
+	double media_arrumada = total_arrumada / repeticoes;
+	double dp_ingenua = desvio_padrao(tempos_ingenua, repeticoes, media_ingenua);
+	double dp_arrumada = desvio_padrao(tempos_arrumada, repeticoes, media_arrumada);
+
+	printf("variant,n,threads,reps,avg_time_sec,stddev_time_sec,checksum\n");
+	printf("naive,%zu,%d,%d,%.6f,%.6f,%.6f\n", n_elementos, num_threads, repeticoes, media_ingenua, dp_ingenua, ultima_soma);
+	printf("tidy,%zu,%d,%d,%.6f,%.6f,%.6f\n", n_elementos, num_threads, repeticoes, media_arrumada, dp_arrumada, ultima_soma);
 
 	free(vetor_a);
 	free(vetor_b);
+	free(tempos_ingenua);
+	free(tempos_arrumada);
 	return 0;
 }

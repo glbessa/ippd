@@ -15,9 +15,10 @@ def load_results(path):
             n = int(row["n"])
             threads = int(row["threads"])
             variant = row["variant"].strip()
-            time = float(row["avg_time_sec"])
+            media = float(row["avg_time_sec"])
+            desvio = float(row.get("stddev_time_sec", 0.0))
             data[n][threads] = data[n].get(threads, {})
-            data[n][threads][variant] = time
+            data[n][threads][variant] = {"media": media, "desvio": desvio}
     return data
 
 
@@ -25,12 +26,14 @@ def plot_times(data):
     os.makedirs(PLOTS_DIR, exist_ok=True)
     for n, by_threads in data.items():
         threads = sorted(by_threads.keys())
-        ingenua = [by_threads[t].get("naive") for t in threads]
-        arrumada = [by_threads[t].get("tidy") for t in threads]
+        ingenua = [by_threads[t].get("naive", {}).get("media") for t in threads]
+        desvio_ingenua = [by_threads[t].get("naive", {}).get("desvio") for t in threads]
+        arrumada = [by_threads[t].get("tidy", {}).get("media") for t in threads]
+        desvio_arrumada = [by_threads[t].get("tidy", {}).get("desvio") for t in threads]
 
         plt.figure(figsize=(6, 4))
-        plt.plot(threads, ingenua, marker="o", label="ingenua: 2 parallel for")
-        plt.plot(threads, arrumada, marker="s", label="arrumada: 1 parallel + 2 for")
+        plt.errorbar(threads, ingenua, yerr=desvio_ingenua, marker="o", linestyle="-", label="ingenua: 2 parallel for")
+        plt.errorbar(threads, arrumada, yerr=desvio_arrumada, marker="s", linestyle="-", label="arrumada: 1 parallel + 2 for")
         plt.xlabel("threads")
         plt.ylabel("tempo medio (s)")
         plt.title(f"Task D: tempo vs threads (N={n})")
@@ -42,8 +45,8 @@ def plot_times(data):
 
         razoes = []
         for t in threads:
-            ingenua_t = by_threads[t].get("naive")
-            arrumada_t = by_threads[t].get("tidy")
+            ingenua_t = by_threads[t].get("naive", {}).get("media")
+            arrumada_t = by_threads[t].get("tidy", {}).get("media")
             razoes.append(arrumada_t / ingenua_t if ingenua_t else float("nan"))
         plt.figure(figsize=(6, 4))
         plt.plot(threads, razoes, marker="d", color="purple")

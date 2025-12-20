@@ -37,7 +37,7 @@ plot:
 task-d: $(BIN_DIR)/task_d
 
 $(BIN_DIR)/task_d: task-d.c | $(BIN_DIR)
-	$(CC) $(CFLAGS_OMP) $< -o $@
+	$(CC) $(CFLAGS_OMP) $< -o $@ -lm
 
 clean:
 	rm -rf results plots
