@@ -25,12 +25,12 @@ def plot_times(data):
     os.makedirs(PLOTS_DIR, exist_ok=True)
     for n, by_threads in data.items():
         threads = sorted(by_threads.keys())
-        naive = [by_threads[t].get("naive") for t in threads]
-        tidy = [by_threads[t].get("tidy") for t in threads]
+        ingenua = [by_threads[t].get("naive") for t in threads]
+        arrumada = [by_threads[t].get("tidy") for t in threads]
 
         plt.figure(figsize=(6, 4))
-        plt.plot(threads, naive, marker="o", label="naive: 2 parallel for")
-        plt.plot(threads, tidy, marker="s", label="arrumada: 1 parallel + 2 for")
+        plt.plot(threads, ingenua, marker="o", label="ingenua: 2 parallel for")
+        plt.plot(threads, arrumada, marker="s", label="arrumada: 1 parallel + 2 for")
         plt.xlabel("threads")
         plt.ylabel("tempo medio (s)")
         plt.title(f"Task D: tempo vs threads (N={n})")
@@ -40,13 +40,13 @@ def plot_times(data):
         plt.savefig(os.path.join(PLOTS_DIR, f"task_d_time_N{n}.png"), dpi=150)
         plt.close()
 
-        ratios = []
+        razoes = []
         for t in threads:
-            naive_t = by_threads[t].get("naive")
-            tidy_t = by_threads[t].get("tidy")
-            ratios.append(tidy_t / naive_t if naive_t else float("nan"))
+            ingenua_t = by_threads[t].get("naive")
+            arrumada_t = by_threads[t].get("tidy")
+            razoes.append(arrumada_t / ingenua_t if ingenua_t else float("nan"))
         plt.figure(figsize=(6, 4))
-        plt.plot(threads, ratios, marker="d", color="purple")
+        plt.plot(threads, razoes, marker="d", color="purple")
         plt.xlabel("threads")
         plt.ylabel("arrumada / ingenua")
         plt.title(f"Task D: razao de tempo (N={n})")
