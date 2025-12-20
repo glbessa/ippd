@@ -17,10 +17,16 @@ seq: $(BIN_DIR)/task_a_seq
 $(BIN_DIR)/task_a_seq: $(SRC_SEQ_DIR)/task_a.c | $(BIN_DIR)
 	$(CC) $(CFLAGS_SEQ) $< -o $@
 
-# Alvo para compilar versões paralelas com OpenMP
-omp: $(BIN_DIR)/task_a_omp
+# Alvo para compilar versões paralelas com OpenMP (Tarefa A: static, dynamic, guided)
+omp: $(BIN_DIR)/task_a_omp_static $(BIN_DIR)/task_a_omp_dynamic $(BIN_DIR)/task_a_omp_guided
 
-$(BIN_DIR)/task_a_omp: $(SRC_OMP_DIR)/task_a/v1.c | $(BIN_DIR)
+$(BIN_DIR)/task_a_omp_static: $(SRC_OMP_DIR)/task_a/v1.c | $(BIN_DIR)
+	$(CC) $(CFLAGS_OMP) $< -o $@
+
+$(BIN_DIR)/task_a_omp_dynamic: $(SRC_OMP_DIR)/task_a/v2.c | $(BIN_DIR)
+	$(CC) $(CFLAGS_OMP) $< -o $@
+
+$(BIN_DIR)/task_a_omp_guided: $(SRC_OMP_DIR)/task_a/v3.c | $(BIN_DIR)
 	$(CC) $(CFLAGS_OMP) $< -o $@
 
 $(BIN_DIR):
