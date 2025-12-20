@@ -6,6 +6,11 @@
 !Makefile
 !*.md
 !trabalho1
+!trabalho1/*.py
+!trabalho1/results/
+!trabalho1/results/*.csv
+!trabalho1/plots/
+!trabalho1/plots/*.png
 !prova
 
 build/
