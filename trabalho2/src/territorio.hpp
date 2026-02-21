@@ -2,6 +2,7 @@
 #define TERRITORIO_HPP
 
 #include <vector>
+#include "posicao.hpp"
 
 // Representa os tipos de células possíveis no território
 enum class TipoCelula {
@@ -32,21 +33,20 @@ class Territorio {
 private:
     int largura;
     int altura;
-    int offsetX; // Posição global X de início do subgrid
-    int offsetY; // Posição global Y de início do subgrid
+    Posicao offset; // Posição global de início do subgrid
     
     // Matriz 1D contínua é muito mais eficiente computacionalmente para OpenMP (cache friendly) e MPI (facilita envio de blocos/halos)
     std::vector<Celula> grid;
 
     // Funções auxiliares (de acordo com as regras de negócio abstratas)
-    TipoCelula f_tipo(int gx, int gy) const;
+    TipoCelula f_tipo(Posicao global) const;
     float f_recurso(TipoCelula tipo) const;
     bool f_acesso(TipoCelula tipo, Estacao estacao) const;
     float f_regeneracao(Estacao estacao) const;
 
 public:
     // Construtor: Inicializa a grade baseada na divisão espacial
-    Territorio(int w, int h, int offX, int offY);
+    Territorio(int w, int h, Posicao offset_inicial);
 
     // Inicializa os atributos da célula baseado na posição global
     void inicializar(Estacao estacao_inicial);
@@ -56,22 +56,21 @@ public:
     void atualizar_recursos(Estacao estacao_atual);
 
     // Consumo de recurso por um agente localmente (precisa ser atômico dependendo do de como os agentes operam)
-    void registrar_consumo(int local_x, int local_y, float quantidade);
+    void registrar_consumo(Posicao local, float quantidade);
 
     // Acessos à célula usando mapeamento de 2D para 1D
-    inline Celula& get_celula(int local_x, int local_y) {
-        return grid[local_y * largura + local_x];
+    inline Celula& get_celula(Posicao local) {
+        return grid[local.y * largura + local.x];
     }
     
-    inline const Celula& get_celula(int local_x, int local_y) const {
-        return grid[local_y * largura + local_x];
+    inline const Celula& get_celula(Posicao local) const {
+        return grid[local.y * largura + local.x];
     }
 
     // Getters úteis
     int get_largura() const { return largura; }
     int get_altura() const { return altura; }
-    int get_offsetX() const { return offsetX; }
-    int get_offsetY() const { return offsetY; }
+    Posicao get_offset() const { return offset; }
     int get_tamanho_total() const { return largura * altura; }
     
     // Retorna ponteiro bruto se precisar para operações de MPI

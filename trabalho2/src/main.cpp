@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
     int local_offsetX = 0;
     
     // Instancia o território local particionado
-    Territorio subgrid(local_width, local_height, local_offsetX, local_offsetY);
+    Territorio subgrid(local_width, local_height, Posicao(local_offsetX, local_offsetY));
     Estacao estacao_atual = Estacao::SECA;
     
     // Inicialização OpenMP paralela (First Touch Policy)

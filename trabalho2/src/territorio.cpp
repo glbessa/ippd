@@ -13,8 +13,8 @@ constexpr float RECURSO_MAX_ROCADO = 800.0f;
 constexpr float TAXA_REGENERACAO_CHEIA = 5.0f;
 constexpr float TAXA_REGENERACAO_SECA = 2.0f;
 
-Territorio::Territorio(int w, int h, int offX, int offY)
-    : largura(w), altura(h), offsetX(offX), offsetY(offY) {
+Territorio::Territorio(int w, int h, Posicao offset_inicial)
+    : largura(w), altura(h), offset(offset_inicial) {
     
     // Aloca continuamente na memória - melhor para cache misses (L1, L2)
     // E permite buffer contíguo ao passar para o MPI
@@ -23,11 +23,11 @@ Territorio::Territorio(int w, int h, int offX, int offY)
 
 // Funções determinísticas espaciais
 // Implementação exata depende da formulação do problema.
-TipoCelula Territorio::f_tipo(int gx, int gy) const {
+TipoCelula Territorio::f_tipo(Posicao global) const {
     // Exemplo de mapeamento determinístico. Intercale ou utilize uma função hash sobre gx/gy.
-    if ((gx % 10 == 0) && (gy % 10 == 0)) return TipoCelula::ALDEIA;
-    if (gx % 5 == 0) return TipoCelula::PESCA; // rios passam nesses eixos
-    if (gy % 4 == 0) return TipoCelula::ROCADO;
+    if ((global.x % 10 == 0) && (global.y % 10 == 0)) return TipoCelula::ALDEIA;
+    if (global.x % 5 == 0) return TipoCelula::PESCA; // rios passam nesses eixos
+    if (global.y % 4 == 0) return TipoCelula::ROCADO;
     return TipoCelula::COLETA;
 }
 
@@ -59,10 +59,9 @@ void Territorio::inicializar(Estacao estacao_inicial) {
     #pragma omp parallel for collapse(2) schedule(static)
     for (int y = 0; y < altura; ++y) {
         for (int x = 0; x < largura; ++x) {
-            int gx = offsetX + x;
-            int gy = offsetY + y;
+            Posicao global(offset.x + x, offset.y + y);
             
-            TipoCelula tipo = f_tipo(gx, gy);
+            TipoCelula tipo = f_tipo(global);
             float recurso = f_recurso(tipo);
             bool acessivel = f_acesso(tipo, estacao_inicial);
 
@@ -105,8 +104,8 @@ void Territorio::atualizar_recursos(Estacao estacao_atual) {
     }
 }
 
-void Territorio::registrar_consumo(int local_x, int local_y, float quantidade) {
-    int index = local_y * largura + local_x;
+void Territorio::registrar_consumo(Posicao local, float quantidade) {
+    int index = local.y * largura + local.x;
     
     // Como os agentes são processados em paralelo (via threads OpenMP),
     // vários agentes podem tentar consumir na MESMA célula simultaneamente!
