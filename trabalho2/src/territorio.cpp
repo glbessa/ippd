@@ -77,7 +77,7 @@ void Territorio::inicializar(Estacao estacao_inicial) {
 void Territorio::atualizar_acessibilidade(Estacao nova_estacao) {
     // Apenas recalcula o status de acesso nas células, de acordo com a nova estação
     #pragma omp parallel for schedule(static)
-    for (int i = 0; i < grid.size(); ++i) {
+    for (int i = 0; i < (int)grid.size(); ++i) {
         grid[i].acessivel = f_acesso(grid[i].tipo, nova_estacao);
     }
 }
@@ -88,7 +88,7 @@ void Territorio::atualizar_recursos(Estacao estacao_atual) {
     // Atualização de dados da área local. Essa rotina é computacionalmente intensiva?
     // Operações em array contíguo: ótimo uso de prefetching!
     #pragma omp parallel for schedule(static)
-    for (int i = 0; i < grid.size(); ++i) {
+    for (int i = 0; i < (int)grid.size(); ++i) {
         // Recurso += regeneracao - consumo_acumulado (limitado ao máx possível de recursos)
         float maximo_capacidade = f_recurso(grid[i].tipo);
         float novo_recurso = grid[i].recurso + regeneracao_base - grid[i].consumo_acumulado_na_celula;

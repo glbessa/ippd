@@ -49,18 +49,26 @@ void Agente::decidir(const Territorio& grid_local, Posicao& dest) const {
         int lnx = nx - grid_local.get_offset().x;
         int lny = ny - grid_local.get_offset().y;
 
-        // Só consideramos células processadas neste local.
-        // A rigor, o `Territorio` precisaria de uma zona halo se fossemos testar vizinhos cross-borders via MPI
-        // Neste momento iterativo, restringimos só para fronteira local
-        if (lnx >= 0 && lnx < grid_local.get_largura() && 
-            lny >= 0 && lny < grid_local.get_altura()) {
-            
-            const Celula& vizinha = grid_local.get_celula(Posicao(lnx, lny));
-            if (vizinha.acessivel && vizinha.recurso > melhor_recurso) {
-                melhor_recurso = vizinha.recurso;
-                dest.x = nx;
-                dest.y = ny;
+        bool is_valid = false;
+        Celula vizinha;
+
+        if (lnx >= 0 && lnx < grid_local.get_largura()) {
+            if (lny >= 0 && lny < grid_local.get_altura()) {
+                vizinha = grid_local.get_celula(Posicao(lnx, lny));
+                is_valid = true;
+            } else if (lny == -1 && grid_local.tem_halo_sup()) {
+                vizinha = grid_local.get_halo_sup(lnx);
+                is_valid = true;
+            } else if (lny == grid_local.get_altura() && grid_local.tem_halo_inf()) {
+                vizinha = grid_local.get_halo_inf(lnx);
+                is_valid = true;
             }
+        }
+
+        if (is_valid && vizinha.acessivel && vizinha.recurso > melhor_recurso) {
+            melhor_recurso = vizinha.recurso;
+            dest.x = nx;
+            dest.y = ny;
         }
     }
 }

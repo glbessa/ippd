@@ -37,6 +37,8 @@ private:
     
     // Matriz 1D contínua é muito mais eficiente computacionalmente para OpenMP (cache friendly) e MPI (facilita envio de blocos/halos)
     std::vector<Celula> grid;
+    std::vector<Celula> halo_sup;
+    std::vector<Celula> halo_inf;
 
     // Funções auxiliares (de acordo com as regras de negócio abstratas)
     TipoCelula f_tipo(Posicao global) const;
@@ -66,6 +68,22 @@ public:
     inline const Celula& get_celula(Posicao local) const {
         return grid[local.y * largura + local.x];
     }
+
+    void alocar_halos(bool tem_sup, bool tem_inf) {
+        if (tem_sup) halo_sup.resize(largura);
+        if (tem_inf) halo_inf.resize(largura);
+    }
+
+    bool tem_halo_sup() const { return !halo_sup.empty(); }
+    bool tem_halo_inf() const { return !halo_inf.empty(); }
+
+    const Celula& get_halo_sup(int x) const { return halo_sup[x]; }
+    const Celula& get_halo_inf(int x) const { return halo_inf[x]; }
+
+    Celula* ptr_linha_sup() { return grid.data(); }
+    Celula* ptr_linha_inf() { return grid.data() + (altura - 1) * largura; }
+    Celula* ptr_halo_sup() { return halo_sup.data(); }
+    Celula* ptr_halo_inf() { return halo_inf.data(); }
 
     // Getters úteis
     int get_largura() const { return largura; }

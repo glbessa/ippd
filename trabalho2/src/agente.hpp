@@ -13,6 +13,7 @@ private:
 
 public:
     // Construtor do agente
+    Agente() : id(-1), energia(0.0f) {}
     Agente(int id, Posicao inicial, float energia_inicial);
 
     // Getters para os atributos
