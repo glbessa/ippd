@@ -9,6 +9,7 @@ bin/
 !Makefile
 !*.md
 !*.cpp
+!*.hpp
 !*.py
 !*.csv
 

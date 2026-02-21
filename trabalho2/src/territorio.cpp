@@ -1,0 +1,116 @@
+#include "territorio.hpp"
+#include <omp.h>
+#include <stdexcept>
+#include <cmath>
+
+// Define valores macro ou constantes baseadas no problema
+constexpr float RECURSO_MAX_ALDEIA = 1000.0f;
+constexpr float RECURSO_MAX_PESCA = 500.0f;
+constexpr float RECURSO_MAX_COLETA = 300.0f;
+constexpr float RECURSO_MAX_ROCADO = 800.0f;
+
+// Taxas de regeneração por estação
+constexpr float TAXA_REGENERACAO_CHEIA = 5.0f;
+constexpr float TAXA_REGENERACAO_SECA = 2.0f;
+
+Territorio::Territorio(int w, int h, int offX, int offY)
+    : largura(w), altura(h), offsetX(offX), offsetY(offY) {
+    
+    // Aloca continuamente na memória - melhor para cache misses (L1, L2)
+    // E permite buffer contíguo ao passar para o MPI
+    grid.resize(largura * altura);
+}
+
+// Funções determinísticas espaciais
+// Implementação exata depende da formulação do problema.
+TipoCelula Territorio::f_tipo(int gx, int gy) const {
+    // Exemplo de mapeamento determinístico. Intercale ou utilize uma função hash sobre gx/gy.
+    if ((gx % 10 == 0) && (gy % 10 == 0)) return TipoCelula::ALDEIA;
+    if (gx % 5 == 0) return TipoCelula::PESCA; // rios passam nesses eixos
+    if (gy % 4 == 0) return TipoCelula::ROCADO;
+    return TipoCelula::COLETA;
+}
+
+float Territorio::f_recurso(TipoCelula tipo) const {
+    switch (tipo) {
+        case TipoCelula::ALDEIA: return RECURSO_MAX_ALDEIA;
+        case TipoCelula::PESCA: return RECURSO_MAX_PESCA;
+        case TipoCelula::ROCADO: return RECURSO_MAX_ROCADO;
+        case TipoCelula::COLETA: return RECURSO_MAX_COLETA;
+        case TipoCelula::INTERDITA: return 0.0f;
+        default: return 0.0f;
+    }
+}
+
+bool Territorio::f_acesso(TipoCelula tipo, Estacao estacao) const {
+    // Exemplo: na estação cheia áreas de pesca podem expandir, ou áreas interditadas mudarem
+    if (tipo == TipoCelula::INTERDITA) return false;
+    if (estacao == Estacao::CHEIA && tipo == TipoCelula::COLETA) return false; // Inundou a coleta
+    return true;
+}
+
+float Territorio::f_regeneracao(Estacao estacao) const {
+    // Retorna a taxa de regeneração baseada na estação
+    return estacao == Estacao::CHEIA ? TAXA_REGENERACAO_CHEIA : TAXA_REGENERACAO_SECA;
+}
+
+void Territorio::inicializar(Estacao estacao_inicial) {
+    // Utilização de OpenMP para inicialização distribuída no multicore (first-touch policy p/ NUMA)
+    #pragma omp parallel for collapse(2) schedule(static)
+    for (int y = 0; y < altura; ++y) {
+        for (int x = 0; x < largura; ++x) {
+            int gx = offsetX + x;
+            int gy = offsetY + y;
+            
+            TipoCelula tipo = f_tipo(gx, gy);
+            float recurso = f_recurso(tipo);
+            bool acessivel = f_acesso(tipo, estacao_inicial);
+
+            int index = y * largura + x;
+            grid[index].tipo = tipo;
+            grid[index].recurso = recurso;
+            grid[index].consumo_acumulado_na_celula = 0.0f;
+            grid[index].acessivel = acessivel;
+        }
+    }
+}
+
+void Territorio::atualizar_acessibilidade(Estacao nova_estacao) {
+    // Apenas recalcula o status de acesso nas células, de acordo com a nova estação
+    #pragma omp parallel for schedule(static)
+    for (int i = 0; i < grid.size(); ++i) {
+        grid[i].acessivel = f_acesso(grid[i].tipo, nova_estacao);
+    }
+}
+
+void Territorio::atualizar_recursos(Estacao estacao_atual) {
+    float regeneracao_base = f_regeneracao(estacao_atual);
+    
+    // Atualização de dados da área local. Essa rotina é computacionalmente intensiva?
+    // Operações em array contíguo: ótimo uso de prefetching!
+    #pragma omp parallel for schedule(static)
+    for (int i = 0; i < grid.size(); ++i) {
+        // Recurso += regeneracao - consumo_acumulado (limitado ao máx possível de recursos)
+        float maximo_capacidade = f_recurso(grid[i].tipo);
+        float novo_recurso = grid[i].recurso + regeneracao_base - grid[i].consumo_acumulado_na_celula;
+        
+        // Clamping manual
+        if (novo_recurso > maximo_capacidade) novo_recurso = maximo_capacidade;
+        if (novo_recurso < 0.0f) novo_recurso = 0.0f;
+        
+        grid[i].recurso = novo_recurso;
+        
+        // Zera o consumo para o próximo ciclo
+        grid[i].consumo_acumulado_na_celula = 0.0f;
+    }
+}
+
+void Territorio::registrar_consumo(int local_x, int local_y, float quantidade) {
+    int index = local_y * largura + local_x;
+    
+    // Como os agentes são processados em paralelo (via threads OpenMP),
+    // vários agentes podem tentar consumir na MESMA célula simultaneamente!
+    // A soma deve ser atômica.
+    #pragma omp atomic
+    grid[index].consumo_acumulado_na_celula += quantidade;
+}
