@@ -1,10 +1,19 @@
 *
 .vscode
 .DS_Store
+build/
+bin/
+
 !*.c
 !*.h
 !Makefile
 !*.md
+!*.cpp
+!*.py
+!*.csv
+
+!src/
+
 !trabalho1
 !trabalho1/*.py
 !trabalho1/results/
@@ -12,8 +21,5 @@
 !trabalho1/plots/
 !trabalho1/plots/*.png
 !prova
-
-build/
-bin/
 
 !trabalho2
