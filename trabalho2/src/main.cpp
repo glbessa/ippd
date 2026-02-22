@@ -71,7 +71,6 @@ int main(int argc, char** argv) {
         if (t > 0 && t % Config::TAMANHO_CICLO_SAZONAL == 0) {
             estacao_atual = (estacao_atual == Estacao::SECA) ? Estacao::CHEIA : Estacao::SECA;
             subgrid.atualizar_acessibilidade(estacao_atual);
-            if (rank == 0) std::cout << "Mudanca de estacao no ciclo " << t << std::endl;
         }
         
         // 5.2 Troca de halo MPI
@@ -327,26 +326,35 @@ void coletar_e_imprimir_metricas(
     int local_num_agentes = (int)agentes_locais.size();
     float local_recursos   = subgrid.get_recursos_totais();
 
-    // ── Otimização MPI: substituição de 9 Reduce individuais por 3 chamadas agrupadas ──
+    // Calcula a energia total local dos agentes para a métrica de média
+    float local_energia_total = 0.0f;
+    #pragma omp parallel for reduction(+:local_energia_total)
+    for (int i = 0; i < local_num_agentes; ++i) {
+        local_energia_total += agentes_locais[i].get_energia();
+    }
+
+    // ── Otimização MPI: substituição de 10 Reduce individuais por chamadas agrupadas ──
     //
-    // Array com os 7 escalares cujo resultado final é uma SOMA entre processos.
+    // Array com os 8 escalares cujo resultado final é uma SOMA entre processos.
     // Índices:
     //   [0] num_agentes   [1] recursos      [2] consumo
     //   [3] regeneracao   [4] migracao      [5] mortes   [6] nascimentos
-    float buf_local[7] = {
+    //   [7] energia_total
+    float buf_local[8] = {
         (float)local_num_agentes,
         local_recursos,
         local_consumo,
         local_regeneracao,
         (float)local_migracao,
         (float)local_mortes,
-        (float)local_nascimentos
+        (float)local_nascimentos,
+        local_energia_total
     };
-    float buf_global[7] = {};
+    float buf_global[8] = {};
 
     // 1ª chamada: MPI_Allreduce (SUM) para todos os valores de soma.
     // Todos os processos recebem o resultado (necessário para global_num_agentes).
-    MPI_Allreduce(buf_local, buf_global, 7, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(buf_local, buf_global, 8, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
 
     int global_num_agentes    = (int)buf_global[0];
     float global_recursos     = buf_global[1];
@@ -355,6 +363,7 @@ void coletar_e_imprimir_metricas(
     int global_migracao_ciclo = (int)buf_global[4];
     int global_mortes         = (int)buf_global[5];
     int global_nascimentos    = (int)buf_global[6];
+    float global_energia_total = buf_global[7];
 
     // 2ª e 3ª chamadas: MAX e MIN de agentes por processo (não podem ser combinados
     // com SUM nem entre si em um único MPI_Reduce sem uma struct customizada).
@@ -374,8 +383,10 @@ void coletar_e_imprimir_metricas(
                   << std::setw(34) << " |" << "\033[0m" << std::endl;
         std::cout << "\033[1;36m" << "├" << std::string(60, '-') << "┤\033[0m" << std::endl;
 
+        float energia_media = (global_num_agentes > 0) ? (global_energia_total / global_num_agentes) : 0.0f;
         std::cout << "  Agentes Totais: " << std::setw(6) << global_num_agentes
-                  << " | Min/Max por Proc: " << std::setw(4) << global_min_agentes << " / " << std::setw(4) << global_max_agentes << std::endl;
+                  << " | Energia Média: " << std::fixed << std::setprecision(2) << energia_media << std::endl;
+        std::cout << "  Distribuição:   Min/Max por Proc: " << std::setw(4) << global_min_agentes << " / " << std::setw(4) << global_max_agentes << std::endl;
 
         std::cout << "  Dinâmica:       " << "\033[1;32m+" << std::setw(3) << global_nascimentos << "\033[0m nascimentos, "
                   << "\033[1;31m-" << std::setw(3) << global_mortes << "\033[0m mortes" << std::endl;

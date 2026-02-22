@@ -4,7 +4,7 @@
 namespace Config {
     // Configurações do Grid Global
     constexpr int LARGURA_GRID = 1000;
-    constexpr int ALTURA_GRID = 1000;
+    constexpr int ALTURA_GRID = 100;
     
     // Configurações da Simulação
     constexpr int SEED = 42;
@@ -22,7 +22,7 @@ namespace Config {
     // Configurações de Carga de Trabalho e Custo de Energia
     constexpr int MAX_CUSTO = 10000;               // Limite máximo de iterações da carga sintética (evita loops excessivos)
     constexpr float CUSTO_METABOLICO = 3.0f;       // Gasto fixo de energia do agente por ciclo (custo base de sobrevivência)
-    constexpr float TAXA_CUSTO_ESFORCO = 0.002f;   // Fator de conversão do esforço computacional em gasto de energia (custo = iterações * taxa)
+    constexpr float TAXA_CUSTO_ESFORCO = 0.005f;   // Fator de conversão do esforço computacional em gasto de energia (custo = iterações * taxa)
     constexpr float FATOR_CARGA_TRABALHO = 100.0f; // Multiplicador que escala o recurso local em número de iterações da carga sintética
     
     // Configurações de Território (Recursos Máximos)
@@ -32,8 +32,8 @@ namespace Config {
     constexpr float RECURSO_MAX_ROCADO = 20.0f;
     
     // Taxas de Regeneração
-    constexpr float TAXA_REGENERACAO_CHEIA = 0.1f;
-    constexpr float TAXA_REGENERACAO_SECA = 0.05f;
+    constexpr float TAXA_REGENERACAO_CHEIA = 0.3f;
+    constexpr float TAXA_REGENERACAO_SECA = -0.2f;
     
     // Fatores de tipos de terreno (f_tipo)
     constexpr int MODULO_ALDEIA = 10;
