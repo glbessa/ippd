@@ -3,8 +3,8 @@
 #include <cmath>
 #include <cstdlib>
 
-Agente::Agente(int id, Posicao inicial, float energia_inicial)
-    : id(id), pos(inicial), energia(energia_inicial) {}
+Agente::Agente(Posicao inicial, float energia_inicial)
+    : pos(inicial), energia(energia_inicial) {}
 
 void Agente::executar_carga(float recurso_local) {
     // O custo é proporcional ao recurso local (quanto mais recurso, mais trabalho para processar/decidir)
@@ -27,7 +27,7 @@ void Agente::executar_carga(float recurso_local) {
     this->energia -= (Config::CUSTO_METABOLICO + custo_esforco);
 }
 
-bool Agente::reproduzir(const Territorio& grid_local, int novo_id, Agente& filho) {
+bool Agente::reproduzir(const Territorio& grid_local, Agente& filho) {
     // Verifica condição de reprodução
     if (energia <= Config::THRESHOLD_REPRODUCAO) {
         return false;
@@ -73,7 +73,7 @@ bool Agente::reproduzir(const Territorio& grid_local, int novo_id, Agente& filho
     this->energia -= energia_transferida;
 
     // Cria o filho na melhor posição adjacente com a energia transferida
-    filho = Agente(novo_id, melhor_pos, energia_transferida);
+    filho = Agente(melhor_pos, energia_transferida);
     return true;
 }
 

@@ -13,7 +13,7 @@
 // Protótipos das funções auxiliares
 std::vector<Agente> inicializar_agentes_locais(int size, int rank, int local_width, int local_height, int local_offsetX, int local_offsetY);
 void trocar_halos_territorio(Territorio& subgrid, int local_width, MPI_Datatype mpi_celula, int rank, int size);
-void processar_agentes(const std::vector<Agente>& agentes_locais, Territorio& subgrid, int local_offsetX, int local_offsetY, int local_width, int local_height, int rank, int size, std::vector<Agente>& nova_lista_local, std::vector<Agente>& buffer_envio_cima, std::vector<Agente>& buffer_envio_baixo, std::atomic<int>& proximo_id, int& mortes_ciclo, int& nascimentos_ciclo);
+void processar_agentes(const std::vector<Agente>& agentes_locais, Territorio& subgrid, int local_offsetX, int local_offsetY, int local_width, int local_height, int rank, int size, std::vector<Agente>& nova_lista_local, std::vector<Agente>& buffer_envio_cima, std::vector<Agente>& buffer_envio_baixo, int& mortes_ciclo, int& nascimentos_ciclo);
 void migrar_agentes_entre_processos(int rank, int size, MPI_Datatype mpi_agente, std::vector<Agente>& agentes_locais, std::vector<Agente>& nova_lista_local, std::vector<Agente>& buffer_envio_cima, std::vector<Agente>& buffer_envio_baixo);
 
 int main(int argc, char** argv) {
@@ -41,13 +41,8 @@ int main(int argc, char** argv) {
     
     srand(Config::SEED); // Seed por processo para garantir reprodutibilidade na execução 
     
-    // 4) Inicializar agentes locais
+    // Inicializar agentes locais
     std::vector<Agente> agentes_locais = inicializar_agentes_locais(size, rank, local_width, local_height, local_offsetX, local_offsetY);
-    
-    // Contador atômico de IDs para novos agentes gerados por reprodução.
-    // O offset garante que IDs gerados em ranks diferentes não colidam.
-    // Usa-se N_AGENTS como base de offset (maior ID inicial possível + 1).
-    std::atomic<int> proximo_id(Config::N_AGENTS + rank * 1000000);
     
     // Criar datatypes MPI para as estruturas
     MPI_Datatype mpi_celula;
@@ -88,7 +83,7 @@ int main(int argc, char** argv) {
 
         int local_mortes = 0;
         int local_nascimentos = 0;
-        processar_agentes(agentes_locais, subgrid, local_offsetX, local_offsetY, local_width, local_height, rank, size, nova_lista_local, buffer_envio_cima, buffer_envio_baixo, proximo_id, local_mortes, local_nascimentos);
+        processar_agentes(agentes_locais, subgrid, local_offsetX, local_offsetY, local_width, local_height, rank, size, nova_lista_local, buffer_envio_cima, buffer_envio_baixo, local_mortes, local_nascimentos);
         
         int local_migracao = buffer_envio_cima.size() + buffer_envio_baixo.size();
         
@@ -188,8 +183,8 @@ std::vector<Agente> inicializar_agentes_locais(int size, int rank, int local_wid
         int gx = rand() % local_width + local_offsetX;
         int gy = rand() % local_height + local_offsetY;
         
-        // Cria o agente com um ID único global (rank * contagem + i)
-        agentes.push_back(Agente(rank * local_agents_count + i, Posicao(gx, gy), Config::ENERGIA_INICIAL_AGENTE));
+        // Cria o agente com uma posição global aleatória
+        agentes.push_back(Agente(Posicao(gx, gy), Config::ENERGIA_INICIAL_AGENTE));
     }
     
     return agentes;
@@ -228,7 +223,6 @@ void processar_agentes(
     std::vector<Agente>& nova_lista_local,
     std::vector<Agente>& buffer_envio_cima,
     std::vector<Agente>& buffer_envio_baixo,
-    std::atomic<int>& proximo_id,
     int& mortes_ciclo,
     int& nascimentos_ciclo) 
 {
@@ -285,7 +279,7 @@ void processar_agentes(
                 
                 // 4. Verifica se o agente se reproduz após consumir recurso
                 Agente filho;
-                if (a_atualizado.reproduzir(subgrid, proximo_id++, filho)) {
+                if (a_atualizado.reproduzir(subgrid, filho)) {
                     lista_local_thread.push_back(filho);
                     total_nascimentos++;
                 }

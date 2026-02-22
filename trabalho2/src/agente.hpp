@@ -7,17 +7,15 @@
 // Classe para abstrair os agentes no sistema (grupos familiares indígenas)
 class Agente {
 private:
-    int id;
     Posicao pos; // Posição global
     float energia; // Estado interno do agente (necessidade/energia)
 
 public:
     // Construtor do agente
-    Agente() : id(-1), energia(0.0f) {}
-    Agente(int id, Posicao inicial, float energia_inicial);
+    Agente() : energia(0.0f) {}
+    Agente(Posicao inicial, float energia_inicial);
 
     // Getters para os atributos
-    int get_id() const { return id; }
     Posicao get_posicao() const { return pos; }
     float get_energia() const { return energia; }
 
@@ -31,7 +29,7 @@ public:
     // O filho nasce na célula adjacente acessível com mais recurso.
     // O pai transfere FATOR_ENERGIA_REPRODUCAO * sua_energia ao filho e perde esse valor.
     // Retorna true e preenche `filho` se a reprodução ocorreu, false caso contrário.
-    bool reproduzir(const Territorio& grid_local, int novo_id, Agente& filho);
+    bool reproduzir(const Territorio& grid_local, Agente& filho);
 
     // Executa uma carga computacional sintética proporcional ao recurso disponível
     // Essa função servirá para stress test do OpenMP e reduzirá a energia do agente
