@@ -5,13 +5,7 @@
 #include <omp.h>
 #include "territorio.hpp"
 #include "agente.hpp"
-
-#define SEED 42 // Seed para randomização
-#define TOTAL_CICLOS 20 // Número total de ciclos
-#define TAMANHO_CICLO_SAZONAL 4 // Tamanho do ciclo sazonal
-#define LARGURA_GRID 1000 // Dimensões do grid global
-#define ALTURA_GRID 1000 // Dimensões do grid global
-#define N_AGENTS 10000 // Número total de agentes
+#include "config.hpp"
 
 // Protótipos das funções auxiliares
 std::vector<Agente> inicializar_agentes_locais(int size, int rank, int local_width, int local_height, int local_offsetX, int local_offsetY);
@@ -29,9 +23,9 @@ int main(int argc, char** argv) {
     
     // Divisão do subgrid local (Simplificada: divisão 1D nas linhas do Grid Global)
     // Para simplificar a demonstração, o particionamento será efetuado pelo número de processos
-    int local_height = ALTURA_GRID / size;
+    int local_height = Config::ALTURA_GRID / size;
     int local_offsetY = rank * local_height;
-    int local_width = LARGURA_GRID; 
+    int local_width = Config::LARGURA_GRID; 
     int local_offsetX = 0;
     
     // Instancia o território local particionado
@@ -42,7 +36,7 @@ int main(int argc, char** argv) {
     subgrid.inicializar(estacao_atual);
     subgrid.alocar_halos(rank > 0, rank < size - 1);
     
-    srand(SEED); // Seed por processo para garantir reprodutibilidade na execução 
+    srand(Config::SEED); // Seed por processo para garantir reprodutibilidade na execução 
     
     // 4) Inicializar agentes locais
     std::vector<Agente> agentes_locais = inicializar_agentes_locais(size, rank, local_width, local_height, local_offsetX, local_offsetY);
@@ -66,9 +60,9 @@ int main(int argc, char** argv) {
     }
     
     // Simulação principal
-    for (int t = 0; t < TOTAL_CICLOS; ++t) {
+    for (int t = 0; t < Config::TOTAL_CICLOS; ++t) {
         // 5.1 Atualizar estação
-        if (t > 0 && t % TAMANHO_CICLO_SAZONAL == 0) {
+        if (t > 0 && t % Config::TAMANHO_CICLO_SAZONAL == 0) {
             estacao_atual = (estacao_atual == Estacao::SECA) ? Estacao::CHEIA : Estacao::SECA;
             subgrid.atualizar_acessibilidade(estacao_atual);
             if (rank == 0) std::cout << "Mudanca de estacao no ciclo " << t << std::endl;
@@ -121,7 +115,7 @@ int main(int argc, char** argv) {
 
 std::vector<Agente> inicializar_agentes_locais(int size, int rank, int local_width, int local_height, int local_offsetX, int local_offsetY) 
 {
-    int local_agents_count = N_AGENTS / size;
+    int local_agents_count = Config::N_AGENTS / size;
     std::vector<Agente> agentes;
     
     // Otimização: reserva o espaço no vetor de uma vez para evitar múltiplas realocações
@@ -133,7 +127,7 @@ std::vector<Agente> inicializar_agentes_locais(int size, int rank, int local_wid
         int gy = rand() % local_height + local_offsetY;
         
         // Cria o agente com um ID único global (rank * contagem + i)
-        agentes.push_back(Agente(rank * local_agents_count + i, Posicao(gx, gy), 20.0f));
+        agentes.push_back(Agente(rank * local_agents_count + i, Posicao(gx, gy), Config::ENERGIA_INICIAL_AGENTE));
     }
     
     return agentes;

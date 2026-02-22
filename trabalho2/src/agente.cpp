@@ -1,20 +1,16 @@
 #include "agente.hpp"
+#include "config.hpp"
 #include <cmath>
 #include <cstdlib>
-
-#define MAX_CUSTO 10000
-#define CUSTO_METABOLICO 2.0f
-#define TAXA_CUSTO_ESFORCO 0.002f
-#define EFICIENCIA_REABASTECIMENTO 0.4f
 
 Agente::Agente(int id, Posicao inicial, float energia_inicial)
     : id(id), pos(inicial), energia(energia_inicial) {}
 
 void Agente::executar_carga(float recurso_local) {
     // O custo é proporcional ao recurso local (quanto mais recurso, mais trabalho para processar/decidir)
-    int custo = static_cast<int>(recurso_local * 100.0f);
-    if (custo > MAX_CUSTO) {
-        custo = MAX_CUSTO;
+    int custo = static_cast<int>(recurso_local * Config::FATOR_CARGA_TRABALHO);
+    if (custo > Config::MAX_CUSTO) {
+        custo = Config::MAX_CUSTO;
     }
 
     // Processamento computacional arbitrário (útil para analisar OpenMP overhead)
@@ -26,9 +22,9 @@ void Agente::executar_carga(float recurso_local) {
     // Gasto de energia: 
     // 1. Custo metabólico fixo - Aumentado para maior rigor
     // 2. Gasto proporcional ao esforço da carga sintética - Peso aumentado
-    float custo_esforco = custo * TAXA_CUSTO_ESFORCO;
+    float custo_esforco = custo * Config::TAXA_CUSTO_ESFORCO;
     
-    this->energia -= (CUSTO_METABOLICO + custo_esforco);
+    this->energia -= (Config::CUSTO_METABOLICO + custo_esforco);
 }
 
 void Agente::decidir(const Territorio& grid_local, Posicao& dest) const {
@@ -86,7 +82,7 @@ void Agente::decidir(const Territorio& grid_local, Posicao& dest) const {
 
 float Agente::consumir_recurso(Territorio& grid_local) {
     // Quantidade fixa que um grupo indígena retira em um ciclo
-    float recurso_requerido = 5.0f;
+    float recurso_requerido = Config::RECURSO_REQUERIDO_AGENTE;
     
     int local_x = pos.x - grid_local.get_offset().x;
     int local_y = pos.y - grid_local.get_offset().y;
@@ -104,7 +100,7 @@ float Agente::consumir_recurso(Territorio& grid_local) {
         grid_local.registrar_consumo(Posicao(local_x, local_y), consumo_real);
         
         // Reabastece as energias do Agente - Eficiência reduzida
-        this->energia += consumo_real * EFICIENCIA_REABASTECIMENTO;
+        this->energia += consumo_real * Config::EFICIENCIA_REABASTECIMENTO;
         
         return consumo_real;
     }

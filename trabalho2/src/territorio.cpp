@@ -1,17 +1,8 @@
 #include "territorio.hpp"
+#include "config.hpp"
 #include <omp.h>
 #include <stdexcept>
 #include <cmath>
-
-// Define valores macro ou constantes baseadas no problema
-#define RECURSO_MAX_ALDEIA 25.0f
-#define RECURSO_MAX_PESCA 15.0f
-#define RECURSO_MAX_COLETA 10.0f
-#define RECURSO_MAX_ROCADO 20.0f
-
-// Taxas de regeneração por estação
-#define TAXA_REGENERACAO_CHEIA 0.1f
-#define TAXA_REGENERACAO_SECA 0.05f
 
 Territorio::Territorio(int w, int h, Posicao offset_inicial)
     : largura(w), altura(h), offset(offset_inicial) {
@@ -25,18 +16,18 @@ Territorio::Territorio(int w, int h, Posicao offset_inicial)
 // Implementação exata depende da formulação do problema.
 TipoCelula Territorio::f_tipo(Posicao global) const {
     // Exemplo de mapeamento determinístico. Intercale ou utilize uma função hash sobre gx/gy.
-    if ((global.x % 10 == 0) && (global.y % 10 == 0)) return TipoCelula::ALDEIA;
-    if (global.x % 5 == 0) return TipoCelula::PESCA; // rios passam nesses eixos
-    if (global.y % 4 == 0) return TipoCelula::ROCADO;
+    if ((global.x % Config::MODULO_ALDEIA == 0) && (global.y % Config::MODULO_ALDEIA == 0)) return TipoCelula::ALDEIA;
+    if (global.x % Config::MODULO_PESCA == 0) return TipoCelula::PESCA; // rios passam nesses eixos
+    if (global.y % Config::MODULO_ROCADO == 0) return TipoCelula::ROCADO;
     return TipoCelula::COLETA;
 }
 
 float Territorio::f_recurso(TipoCelula tipo) const {
     switch (tipo) {
-        case TipoCelula::ALDEIA: return RECURSO_MAX_ALDEIA;
-        case TipoCelula::PESCA: return RECURSO_MAX_PESCA;
-        case TipoCelula::ROCADO: return RECURSO_MAX_ROCADO;
-        case TipoCelula::COLETA: return RECURSO_MAX_COLETA;
+        case TipoCelula::ALDEIA: return Config::RECURSO_MAX_ALDEIA;
+        case TipoCelula::PESCA: return Config::RECURSO_MAX_PESCA;
+        case TipoCelula::ROCADO: return Config::RECURSO_MAX_ROCADO;
+        case TipoCelula::COLETA: return Config::RECURSO_MAX_COLETA;
         case TipoCelula::INTERDITA: return 0.0f;
         default: return 0.0f;
     }
@@ -51,7 +42,7 @@ bool Territorio::f_acesso(TipoCelula tipo, Estacao estacao) const {
 
 float Territorio::f_regeneracao(Estacao estacao) const {
     // Retorna a taxa de regeneração baseada na estação
-    return estacao == Estacao::CHEIA ? TAXA_REGENERACAO_CHEIA : TAXA_REGENERACAO_SECA;
+    return estacao == Estacao::CHEIA ? Config::TAXA_REGENERACAO_CHEIA : Config::TAXA_REGENERACAO_SECA;
 }
 
 void Territorio::inicializar(Estacao estacao_inicial) {
