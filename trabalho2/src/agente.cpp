@@ -27,6 +27,56 @@ void Agente::executar_carga(float recurso_local) {
     this->energia -= (Config::CUSTO_METABOLICO + custo_esforco);
 }
 
+bool Agente::reproduzir(const Territorio& grid_local, int novo_id, Agente& filho) {
+    // Verifica condição de reprodução
+    if (energia <= Config::THRESHOLD_REPRODUCAO) {
+        return false;
+    }
+
+    // Converte posição global para referencial local
+    int local_x = pos.x - grid_local.get_offset().x;
+    int local_y = pos.y - grid_local.get_offset().y;
+
+    // Varredura da vizinhança de Moore para encontrar a célula adjacente
+    // acessível com mais recurso (ignora halos: filho nasce dentro do subgrid)
+    int dx[] = {-1,  0,  1, -1, 1, -1, 0, 1};
+    int dy[] = {-1, -1, -1,  0, 0,  1, 1, 1};
+
+    Posicao melhor_pos = pos; // Padrão: manter posição (fallback)
+    float melhor_recurso = -1.0f;
+    bool encontrou_vizinho = false;
+
+    for (int i = 0; i < 8; ++i) {
+        int lnx = local_x + dx[i];
+        int lny = local_y + dy[i];
+
+        // Apenas células dentro do subgrid local (sem halos)
+        if (lnx >= 0 && lnx < grid_local.get_largura() &&
+            lny >= 0 && lny < grid_local.get_altura()) {
+            
+            const Celula& vizinha = grid_local.get_celula(Posicao(lnx, lny));
+            if (vizinha.acessivel && vizinha.recurso > melhor_recurso) {
+                melhor_recurso = vizinha.recurso;
+                melhor_pos = Posicao(pos.x + dx[i], pos.y + dy[i]); // Posição global
+                encontrou_vizinho = true;
+            }
+        }
+    }
+
+    // Só reproduz se houver alguma célula adjacente acessível
+    if (!encontrou_vizinho) {
+        return false;
+    }
+
+    // Calcula a energia transferida e atualiza o pai
+    float energia_transferida = energia * Config::FATOR_ENERGIA_REPRODUCAO;
+    this->energia -= energia_transferida;
+
+    // Cria o filho na melhor posição adjacente com a energia transferida
+    filho = Agente(novo_id, melhor_pos, energia_transferida);
+    return true;
+}
+
 void Agente::decidir(const Territorio& grid_local, Posicao& dest) const {
     // Algoritmo local de decisão:
     // Agente verifica células vizinhas acessíveis e com maior recurso disponível.

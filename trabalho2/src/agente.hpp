@@ -24,6 +24,15 @@ public:
     // Atualiza a posição do agente
     void set_posicao(Posicao nova) { pos = nova; }
 
+    // Atualiza a energia do agente (usado na reprodução para ceder energia ao filho)
+    void set_energia(float e) { energia = e; }
+
+    // Tenta reproduzir o agente caso sua energia supere THRESHOLD_REPRODUCAO.
+    // O filho nasce na célula adjacente acessível com mais recurso.
+    // O pai transfere FATOR_ENERGIA_REPRODUCAO * sua_energia ao filho e perde esse valor.
+    // Retorna true e preenche `filho` se a reprodução ocorreu, false caso contrário.
+    bool reproduzir(const Territorio& grid_local, int novo_id, Agente& filho);
+
     // Executa uma carga computacional sintética proporcional ao recurso disponível
     // Essa função servirá para stress test do OpenMP e reduzirá a energia do agente
     void executar_carga(float recurso_local);

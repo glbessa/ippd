@@ -1,8 +1,11 @@
 #include <iostream>
 #include <vector>
 #include <cstdlib>
+#include <atomic>
 #include <mpi.h>
 #include <omp.h>
+#include <iomanip>
+#include <string>
 #include "territorio.hpp"
 #include "agente.hpp"
 #include "config.hpp"
@@ -10,7 +13,7 @@
 // Protótipos das funções auxiliares
 std::vector<Agente> inicializar_agentes_locais(int size, int rank, int local_width, int local_height, int local_offsetX, int local_offsetY);
 void trocar_halos_territorio(Territorio& subgrid, int local_width, MPI_Datatype mpi_celula, int rank, int size);
-void processar_agentes(const std::vector<Agente>& agentes_locais, Territorio& subgrid, int local_offsetX, int local_offsetY, int local_width, int local_height, int rank, int size, std::vector<Agente>& nova_lista_local, std::vector<Agente>& buffer_envio_cima, std::vector<Agente>& buffer_envio_baixo);
+void processar_agentes(const std::vector<Agente>& agentes_locais, Territorio& subgrid, int local_offsetX, int local_offsetY, int local_width, int local_height, int rank, int size, std::vector<Agente>& nova_lista_local, std::vector<Agente>& buffer_envio_cima, std::vector<Agente>& buffer_envio_baixo, std::atomic<int>& proximo_id, int& mortes_ciclo, int& nascimentos_ciclo);
 void migrar_agentes_entre_processos(int rank, int size, MPI_Datatype mpi_agente, std::vector<Agente>& agentes_locais, std::vector<Agente>& nova_lista_local, std::vector<Agente>& buffer_envio_cima, std::vector<Agente>& buffer_envio_baixo);
 
 int main(int argc, char** argv) {
@@ -40,6 +43,11 @@ int main(int argc, char** argv) {
     
     // 4) Inicializar agentes locais
     std::vector<Agente> agentes_locais = inicializar_agentes_locais(size, rank, local_width, local_height, local_offsetX, local_offsetY);
+    
+    // Contador atômico de IDs para novos agentes gerados por reprodução.
+    // O offset garante que IDs gerados em ranks diferentes não colidam.
+    // Usa-se N_AGENTS como base de offset (maior ID inicial possível + 1).
+    std::atomic<int> proximo_id(Config::N_AGENTS + rank * 1000000);
     
     // Criar datatypes MPI para as estruturas
     MPI_Datatype mpi_celula;
@@ -78,7 +86,9 @@ int main(int argc, char** argv) {
         std::vector<Agente> buffer_envio_baixo;
         std::vector<Agente> nova_lista_local;
 
-        processar_agentes(agentes_locais, subgrid, local_offsetX, local_offsetY, local_width, local_height, rank, size, nova_lista_local, buffer_envio_cima, buffer_envio_baixo);
+        int local_mortes = 0;
+        int local_nascimentos = 0;
+        processar_agentes(agentes_locais, subgrid, local_offsetX, local_offsetY, local_width, local_height, rank, size, nova_lista_local, buffer_envio_cima, buffer_envio_baixo, proximo_id, local_mortes, local_nascimentos);
         
         int local_migracao = buffer_envio_cima.size() + buffer_envio_baixo.size();
         
@@ -113,20 +123,41 @@ int main(int argc, char** argv) {
 
         int global_migracao_ciclo = 0;
         MPI_Reduce(&local_migracao, &global_migracao_ciclo, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+        int global_mortes = 0;
+        int global_nascimentos = 0;
+        MPI_Reduce(&local_mortes, &global_mortes, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+        MPI_Reduce(&local_nascimentos, &global_nascimentos, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
         
         if (rank == 0) {
             volume_migracao_total += global_migracao_ciclo;
             float recursos_medios = global_recursos / (Config::LARGURA_GRID * Config::ALTURA_GRID);
             bool sustentavel = global_regeneracao >= global_consumo;
             
-            std::cout << "Ciclo " << t << " [" << (estacao_atual == Estacao::SECA ? "SECA" : "CHEIA") << "]"
-                      << " - Agentes Globais: " << global_num_agentes 
-                      << " - Agentes por Proc (Min/Max): " << global_min_agentes << " / " << global_max_agentes
-                      << " - Volume Migração (Ciclo/Total): " << global_migracao_ciclo << " / " << volume_migracao_total
-                      << " - Recursos Totais: " << global_recursos 
-                      << " - Recurso Médio/Celula: " << recursos_medios << std::endl;
-            std::cout << " - Sustentabilidade: " << (sustentavel ? "POSITIVA" : "NEGATIVA")
-                      << " (Regeneração: " << global_regeneracao << " vs Consumo: " << global_consumo << ")" << std::endl;
+            std::cout << "\033[1;36m" << "┌" << std::string(60, '-') << "┐\033[0m" << std::endl;
+            std::cout << "\033[1;36m| CICLO " << std::setw(4) << t << " [" 
+                      << (estacao_atual == Estacao::SECA ? "\033[1;33mSECA" : "\033[1;34mCHEIA") << "\033[1;36m]" 
+                      << std::setw(34) << " |" << "\033[0m" << std::endl;
+            std::cout << "\033[1;36m" << "├" << std::string(60, '-') << "┤\033[0m" << std::endl;
+            
+            std::cout << "  Agentes Totais: " << std::setw(6) << global_num_agentes 
+                      << " | Min/Max por Proc: " << std::setw(4) << global_min_agentes << " / " << std::setw(4) << global_max_agentes << std::endl;
+            
+            std::cout << "  Dinâmica:       " << "\033[1;32m+" << std::setw(3) << global_nascimentos << "\033[0m nascimentos, "
+                      << "\033[1;31m-" << std::setw(3) << global_mortes << "\033[0m mortes" << std::endl;
+            
+            std::cout << "  Migração:       " << std::setw(5) << global_migracao_ciclo << " (Ciclo) | " 
+                      << std::setw(8) << volume_migracao_total << " (Acumulada)" << std::endl;
+            
+            std::cout << "  Recursos:       " << std::fixed << std::setprecision(1) << std::setw(8) << global_recursos 
+                      << " (Total) | " << std::setprecision(2) << recursos_medios << " (Méd/Cel)" << std::endl;
+            
+            std::cout << "  Sustentabilidade: " 
+                      << (sustentavel ? "\033[1;32m[POSITIVA]\033[0m" : "\033[1;31m[NEGATIVA]\033[0m")
+                      << " (Reg: " << std::fixed << std::setprecision(1) << global_regeneracao 
+                      << " vs Cons: " << global_consumo << ")" << std::endl;
+            
+            std::cout << "\033[1;36m" << "└" << std::string(60, '-') << "┘\033[0m" << std::endl;
         }
 
         // 5.7 Barreira MPI por garantia de ciclo síncrono
@@ -196,14 +227,20 @@ void processar_agentes(
     int rank, int size,
     std::vector<Agente>& nova_lista_local,
     std::vector<Agente>& buffer_envio_cima,
-    std::vector<Agente>& buffer_envio_baixo) 
+    std::vector<Agente>& buffer_envio_baixo,
+    std::atomic<int>& proximo_id,
+    int& mortes_ciclo,
+    int& nascimentos_ciclo) 
 {
     // Limpa os buffers para a nova iteração
     nova_lista_local.clear();
     buffer_envio_cima.clear();
     buffer_envio_baixo.clear();
+    
+    int total_mortes = 0;
+    int total_nascimentos = 0;
 
-    #pragma omp parallel
+    #pragma omp parallel reduction(+:total_mortes, total_nascimentos)
     {
         // Vetores privados para cada thread (evita contenção no início)
         std::vector<Agente> envio_cima_thread;
@@ -227,6 +264,7 @@ void processar_agentes(
             
             // 2. Verifica se o agente ainda está vivo
             if (a_atualizado.get_energia() <= 0) {
+                total_mortes++;
                 continue; // O agente morreu e não será adicionado a nenhuma lista
             }
 
@@ -244,6 +282,13 @@ void processar_agentes(
             } else {
                 a_atualizado.consumir_recurso(subgrid);
                 lista_local_thread.push_back(a_atualizado);
+                
+                // 4. Verifica se o agente se reproduz após consumir recurso
+                Agente filho;
+                if (a_atualizado.reproduzir(subgrid, proximo_id++, filho)) {
+                    lista_local_thread.push_back(filho);
+                    total_nascimentos++;
+                }
             }
         }
 
@@ -255,6 +300,9 @@ void processar_agentes(
             nova_lista_local.insert(nova_lista_local.end(), lista_local_thread.begin(), lista_local_thread.end());
         }
     }
+    
+    mortes_ciclo = total_mortes;
+    nascimentos_ciclo = total_nascimentos;
 }
 
 void migrar_agentes_entre_processos(

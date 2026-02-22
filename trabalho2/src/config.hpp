@@ -16,6 +16,8 @@ namespace Config {
     constexpr float ENERGIA_INICIAL_AGENTE = 10.0f;
     constexpr float RECURSO_REQUERIDO_AGENTE = 10.0f;
     constexpr float EFICIENCIA_REABASTECIMENTO = 0.4f;
+    constexpr float THRESHOLD_REPRODUCAO = 25.0f;      // Energia mínima para o agente se reproduzir
+    constexpr float FATOR_ENERGIA_REPRODUCAO = 0.4f;   // Fração da energia do pai transferida ao filho na reprodução
     
     // Configurações de Carga de Trabalho e Custo de Energia
     constexpr int MAX_CUSTO = 10000;               // Limite máximo de iterações da carga sintética (evita loops excessivos)
