@@ -2,12 +2,16 @@
 #include <cmath>
 #include <cstdlib>
 
+#define MAX_CUSTO 10000
+#define CUSTO_METABOLICO 2.0f
+#define TAXA_CUSTO_ESFORCO 0.002f
+#define EFICIENCIA_REABASTECIMENTO 0.4f
+
 Agente::Agente(int id, Posicao inicial, float energia_inicial)
     : id(id), pos(inicial), energia(energia_inicial) {}
 
-void Agente::executar_carga(float recurso_local) const {
-    // Escala de interações arbitrárias (pode ser ajustada no grid ou main)
-    int MAX_CUSTO = 10000;
+void Agente::executar_carga(float recurso_local) {
+    // O custo é proporcional ao recurso local (quanto mais recurso, mais trabalho para processar/decidir)
     int custo = static_cast<int>(recurso_local * 100.0f);
     if (custo > MAX_CUSTO) {
         custo = MAX_CUSTO;
@@ -18,6 +22,13 @@ void Agente::executar_carga(float recurso_local) const {
     for (int i = 0; i < custo; ++i) {
         dummy += std::sin(static_cast<double>(i)) * std::cos(static_cast<double>(i));
     }
+
+    // Gasto de energia: 
+    // 1. Custo metabólico fixo - Aumentado para maior rigor
+    // 2. Gasto proporcional ao esforço da carga sintética - Peso aumentado
+    float custo_esforco = custo * TAXA_CUSTO_ESFORCO;
+    
+    this->energia -= (CUSTO_METABOLICO + custo_esforco);
 }
 
 void Agente::decidir(const Territorio& grid_local, Posicao& dest) const {
@@ -92,8 +103,8 @@ float Agente::consumir_recurso(Territorio& grid_local) {
         // O `registrar_consumo` deverá tratar a atomicidade do OpenMP
         grid_local.registrar_consumo(Posicao(local_x, local_y), consumo_real);
         
-        // Reabastece as energias do Agente
-        this->energia += consumo_real * 0.5f;
+        // Reabastece as energias do Agente - Eficiência reduzida
+        this->energia += consumo_real * 0.4f;
         
         return consumo_real;
     }

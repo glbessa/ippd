@@ -4,14 +4,14 @@
 #include <cmath>
 
 // Define valores macro ou constantes baseadas no problema
-constexpr float RECURSO_MAX_ALDEIA = 1000.0f;
-constexpr float RECURSO_MAX_PESCA = 500.0f;
-constexpr float RECURSO_MAX_COLETA = 300.0f;
-constexpr float RECURSO_MAX_ROCADO = 800.0f;
+#define RECURSO_MAX_ALDEIA 25.0f
+#define RECURSO_MAX_PESCA 15.0f
+#define RECURSO_MAX_COLETA 10.0f
+#define RECURSO_MAX_ROCADO 20.0f
 
 // Taxas de regeneração por estação
-constexpr float TAXA_REGENERACAO_CHEIA = 5.0f;
-constexpr float TAXA_REGENERACAO_SECA = 2.0f;
+#define TAXA_REGENERACAO_CHEIA 0.1f
+#define TAXA_REGENERACAO_SECA 0.05f
 
 Territorio::Territorio(int w, int h, Posicao offset_inicial)
     : largura(w), altura(h), offset(offset_inicial) {
@@ -114,4 +114,13 @@ void Territorio::registrar_consumo(Posicao local, float quantidade) {
     // A soma deve ser atômica.
     #pragma omp atomic
     grid[index].consumo_acumulado_na_celula += quantidade;
+}
+
+float Territorio::get_recursos_totais() const {
+    float total = 0.0f;
+    #pragma omp parallel for reduction(+:total)
+    for (int i = 0; i < (int)grid.size(); ++i) {
+        total += grid[i].recurso;
+    }
+    return total;
 }

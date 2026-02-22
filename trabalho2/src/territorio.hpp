@@ -90,6 +90,7 @@ public:
     int get_altura() const { return altura; }
     Posicao get_offset() const { return offset; }
     int get_tamanho_total() const { return largura * altura; }
+    float get_recursos_totais() const;
     
     // Retorna ponteiro bruto se precisar para operações de MPI
     Celula* data() { return grid.data(); }

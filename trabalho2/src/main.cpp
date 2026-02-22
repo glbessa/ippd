@@ -7,11 +7,17 @@
 #include "agente.hpp"
 
 #define SEED 42 // Seed para randomização
-#define TOTAL_CICLOS 10 // Número total de ciclos
+#define TOTAL_CICLOS 20 // Número total de ciclos
 #define TAMANHO_CICLO_SAZONAL 4 // Tamanho do ciclo sazonal
 #define LARGURA_GRID 1000 // Dimensões do grid global
 #define ALTURA_GRID 1000 // Dimensões do grid global
 #define N_AGENTS 10000 // Número total de agentes
+
+// Protótipos das funções auxiliares
+std::vector<Agente> inicializar_agentes_locais(int size, int rank, int local_width, int local_height, int local_offsetX, int local_offsetY);
+void trocar_halos_territorio(Territorio& subgrid, int local_width, MPI_Datatype mpi_celula, int rank, int size);
+void processar_agentes(const std::vector<Agente>& agentes_locais, Territorio& subgrid, int local_offsetX, int local_offsetY, int local_width, int local_height, int rank, int size, std::vector<Agente>& nova_lista_local, std::vector<Agente>& buffer_envio_cima, std::vector<Agente>& buffer_envio_baixo);
+void migrar_agentes_entre_processos(int rank, int size, MPI_Datatype mpi_agente, std::vector<Agente>& agentes_locais, std::vector<Agente>& nova_lista_local, std::vector<Agente>& buffer_envio_cima, std::vector<Agente>& buffer_envio_baixo);
 
 int main(int argc, char** argv) {
     int rank, size;
@@ -89,8 +95,13 @@ int main(int argc, char** argv) {
         int global_num_agentes = 0;
         MPI_Allreduce(&local_num_agentes, &global_num_agentes, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
         
+        float local_recursos = subgrid.get_recursos_totais();
+        float global_recursos = 0;
+        MPI_Reduce(&local_recursos, &global_recursos, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+        
         if (rank == 0) {
-            std::cout << "Ciclo " << t << " - Agentes Globais: " << global_num_agentes << std::endl;
+            std::cout << "Ciclo " << t << " - Agentes Globais: " << global_num_agentes 
+                      << " - Recursos Totais: " << global_recursos << std::endl;
         }
 
         // 5.7 Barreira MPI por garantia de ciclo síncrono
@@ -122,7 +133,7 @@ std::vector<Agente> inicializar_agentes_locais(int size, int rank, int local_wid
         int gy = rand() % local_height + local_offsetY;
         
         // Cria o agente com um ID único global (rank * contagem + i)
-        agentes.push_back(Agente(rank * local_agents_count + i, Posicao(gx, gy), 100.0f));
+        agentes.push_back(Agente(rank * local_agents_count + i, Posicao(gx, gy), 20.0f));
     }
     
     return agentes;
@@ -176,8 +187,8 @@ void processar_agentes(
 
         #pragma omp for
         for (int i = 0; i < (int)agentes_locais.size(); ++i) {
-            const Agente& a = agentes_locais[i];
-            Posicao celula_atual = a.get_posicao();
+            Agente a_atualizado = agentes_locais[i];
+            Posicao celula_atual = a_atualizado.get_posicao();
             int lnx = celula_atual.x - local_offsetX;
             int lny = celula_atual.y - local_offsetY;
             
@@ -186,13 +197,17 @@ void processar_agentes(
                  r = subgrid.get_celula(Posicao(lnx, lny)).recurso;
             }
             
-            // Executa carga de trabalho (stress test do OpenMP)
-            a.executar_carga(r);
+            // 1. Executa carga de trabalho e CONSOME energia (Agora afeta o agente)
+            a_atualizado.executar_carga(r);
             
+            // 2. Verifica se o agente ainda está vivo
+            if (a_atualizado.get_energia() <= 0) {
+                continue; // O agente morreu e não será adicionado a nenhuma lista
+            }
+
+            // 3. Se vivo, decide o próximo passo
             Posicao destino;
-            a.decidir(subgrid, destino);
-            
-            Agente a_atualizado = a;
+            a_atualizado.decidir(subgrid, destino);
             a_atualizado.set_posicao(destino);
             
             // Lógica de Migração ou Permanência Local

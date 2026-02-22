@@ -25,8 +25,8 @@ public:
     void set_posicao(Posicao nova) { pos = nova; }
 
     // Executa uma carga computacional sintética proporcional ao recurso disponível
-    // Essa função servirá para stress test do OpenMP
-    void executar_carga(float recurso_local) const;
+    // Essa função servirá para stress test do OpenMP e reduzirá a energia do agente
+    void executar_carga(float recurso_local);
 
     // Regras locais de decisão para o deslocamento do agente.
     // Avalia o territorio e decide qual posição (dest_x, dest_y) o agente deseja ir
