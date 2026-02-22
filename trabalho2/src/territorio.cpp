@@ -56,6 +56,8 @@ float Territorio::f_regeneracao(Estacao estacao) const {
 
 void Territorio::inicializar(Estacao estacao_inicial) {
     // Utilização de OpenMP para inicialização distribuída no multicore (first-touch policy p/ NUMA)
+    // collapse(2) para "juntar" os dois loops
+    // schedule(static) para eficiência na distribuição de trabalho
     #pragma omp parallel for collapse(2) schedule(static)
     for (int y = 0; y < altura; ++y) {
         for (int x = 0; x < largura; ++x) {
