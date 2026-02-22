@@ -115,3 +115,17 @@ float Territorio::get_recursos_totais() const {
     }
     return total;
 }
+
+float Territorio::get_consumo_total() const {
+    float total = 0.0f;
+    #pragma omp parallel for reduction(+:total)
+    for (int i = 0; i < (int)grid.size(); ++i) {
+        total += grid[i].consumo_acumulado_na_celula;
+    }
+    return total;
+}
+
+float Territorio::get_regeneracao_total(Estacao estacao) const {
+    // A regeneração é o potencial total da natureza no subgrid
+    return f_regeneracao(estacao) * grid.size();
+}

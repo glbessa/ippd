@@ -91,6 +91,8 @@ public:
     Posicao get_offset() const { return offset; }
     int get_tamanho_total() const { return largura * altura; }
     float get_recursos_totais() const;
+    float get_consumo_total() const;
+    float get_regeneracao_total(Estacao estacao) const;
     
     // Retorna ponteiro bruto se precisar para operações de MPI
     Celula* data() { return grid.data(); }

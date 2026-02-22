@@ -59,6 +59,8 @@ int main(int argc, char** argv) {
         }
     }
     
+    long long volume_migracao_total = 0;
+    
     // Simulação principal
     for (int t = 0; t < Config::TOTAL_CICLOS; ++t) {
         // 5.1 Atualizar estação
@@ -78,24 +80,53 @@ int main(int argc, char** argv) {
 
         processar_agentes(agentes_locais, subgrid, local_offsetX, local_offsetY, local_width, local_height, rank, size, nova_lista_local, buffer_envio_cima, buffer_envio_baixo);
         
+        int local_migracao = buffer_envio_cima.size() + buffer_envio_baixo.size();
+        
         // 5.4 Migração de agentes com MPI
         migrar_agentes_entre_processos(rank, size, mpi_agente, agentes_locais, nova_lista_local, buffer_envio_cima, buffer_envio_baixo);
 
-        // 5.5 Atualizar grid local via OpenMP paralelizável
+        // 5.5 Calcular métricas de consumo e regeneração antes de atualizar (e zerar) o consumo
+        float local_consumo = subgrid.get_consumo_total();
+        float local_regeneracao = subgrid.get_regeneracao_total(estacao_atual);
+
+        // 5.6 Atualizar grid local via OpenMP paralelizável
         subgrid.atualizar_recursos(estacao_atual);
         
-        // 5.6 Métricas globais
+        // 5.7 Métricas globais
         int local_num_agentes = agentes_locais.size();
         int global_num_agentes = 0;
         MPI_Allreduce(&local_num_agentes, &global_num_agentes, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
         
+        int global_max_agentes = 0;
+        int global_min_agentes = 0;
+        MPI_Reduce(&local_num_agentes, &global_max_agentes, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+        MPI_Reduce(&local_num_agentes, &global_min_agentes, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
+
         float local_recursos = subgrid.get_recursos_totais();
         float global_recursos = 0;
         MPI_Reduce(&local_recursos, &global_recursos, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+        float global_consumo = 0;
+        float global_regeneracao = 0;
+        MPI_Reduce(&local_consumo, &global_consumo, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+        MPI_Reduce(&local_regeneracao, &global_regeneracao, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+        int global_migracao_ciclo = 0;
+        MPI_Reduce(&local_migracao, &global_migracao_ciclo, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
         
         if (rank == 0) {
-            std::cout << "Ciclo " << t << " - Agentes Globais: " << global_num_agentes 
-                      << " - Recursos Totais: " << global_recursos << std::endl;
+            volume_migracao_total += global_migracao_ciclo;
+            float recursos_medios = global_recursos / (Config::LARGURA_GRID * Config::ALTURA_GRID);
+            bool sustentavel = global_regeneracao >= global_consumo;
+            
+            std::cout << "Ciclo " << t << " [" << (estacao_atual == Estacao::SECA ? "SECA" : "CHEIA") << "]"
+                      << " - Agentes Globais: " << global_num_agentes 
+                      << " - Agentes por Proc (Min/Max): " << global_min_agentes << " / " << global_max_agentes
+                      << " - Volume Migração (Ciclo/Total): " << global_migracao_ciclo << " / " << volume_migracao_total
+                      << " - Recursos Totais: " << global_recursos 
+                      << " - Recurso Médio/Celula: " << recursos_medios << std::endl;
+            std::cout << " - Sustentabilidade: " << (sustentavel ? "POSITIVA" : "NEGATIVA")
+                      << " (Regeneração: " << global_regeneracao << " vs Consumo: " << global_consumo << ")" << std::endl;
         }
 
         // 5.7 Barreira MPI por garantia de ciclo síncrono
