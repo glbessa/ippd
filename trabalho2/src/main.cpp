@@ -15,6 +15,7 @@ std::vector<Agente> inicializar_agentes_locais(int size, int rank, int local_wid
 void trocar_halos_territorio(Territorio& subgrid, int local_width, MPI_Datatype mpi_celula, int rank, int size);
 void processar_agentes(const std::vector<Agente>& agentes_locais, Territorio& subgrid, int local_offsetX, int local_offsetY, int local_width, int local_height, int rank, int size, std::vector<Agente>& nova_lista_local, std::vector<Agente>& buffer_envio_cima, std::vector<Agente>& buffer_envio_baixo, int& mortes_ciclo, int& nascimentos_ciclo);
 void migrar_agentes_entre_processos(int rank, int size, MPI_Datatype mpi_agente, std::vector<Agente>& agentes_locais, std::vector<Agente>& nova_lista_local, std::vector<Agente>& buffer_envio_cima, std::vector<Agente>& buffer_envio_baixo);
+void coletar_e_imprimir_metricas(int rank, int t, Estacao estacao_atual, const std::vector<Agente>& agentes_locais, Territorio& subgrid, int local_migracao, float local_consumo, float local_regeneracao, int local_mortes, int local_nascimentos, long long& volume_migracao_total);
 
 int main(int argc, char** argv) {
     int rank, size;
@@ -98,62 +99,9 @@ int main(int argc, char** argv) {
         subgrid.atualizar_recursos(estacao_atual);
         
         // 5.7 Métricas globais
-        int local_num_agentes = agentes_locais.size();
-        int global_num_agentes = 0;
-        MPI_Allreduce(&local_num_agentes, &global_num_agentes, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-        
-        int global_max_agentes = 0;
-        int global_min_agentes = 0;
-        MPI_Reduce(&local_num_agentes, &global_max_agentes, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
-        MPI_Reduce(&local_num_agentes, &global_min_agentes, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
-
-        float local_recursos = subgrid.get_recursos_totais();
-        float global_recursos = 0;
-        MPI_Reduce(&local_recursos, &global_recursos, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-        float global_consumo = 0;
-        float global_regeneracao = 0;
-        MPI_Reduce(&local_consumo, &global_consumo, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-        MPI_Reduce(&local_regeneracao, &global_regeneracao, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-        int global_migracao_ciclo = 0;
-        MPI_Reduce(&local_migracao, &global_migracao_ciclo, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-        int global_mortes = 0;
-        int global_nascimentos = 0;
-        MPI_Reduce(&local_mortes, &global_mortes, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-        MPI_Reduce(&local_nascimentos, &global_nascimentos, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-        
-        if (rank == 0) {
-            volume_migracao_total += global_migracao_ciclo;
-            float recursos_medios = global_recursos / (Config::LARGURA_GRID * Config::ALTURA_GRID);
-            bool sustentavel = global_regeneracao >= global_consumo;
-            
-            std::cout << "\033[1;36m" << "┌" << std::string(60, '-') << "┐\033[0m" << std::endl;
-            std::cout << "\033[1;36m| CICLO " << std::setw(4) << t << " [" 
-                      << (estacao_atual == Estacao::SECA ? "\033[1;33mSECA" : "\033[1;34mCHEIA") << "\033[1;36m]" 
-                      << std::setw(34) << " |" << "\033[0m" << std::endl;
-            std::cout << "\033[1;36m" << "├" << std::string(60, '-') << "┤\033[0m" << std::endl;
-            
-            std::cout << "  Agentes Totais: " << std::setw(6) << global_num_agentes 
-                      << " | Min/Max por Proc: " << std::setw(4) << global_min_agentes << " / " << std::setw(4) << global_max_agentes << std::endl;
-            
-            std::cout << "  Dinâmica:       " << "\033[1;32m+" << std::setw(3) << global_nascimentos << "\033[0m nascimentos, "
-                      << "\033[1;31m-" << std::setw(3) << global_mortes << "\033[0m mortes" << std::endl;
-            
-            std::cout << "  Migração:       " << std::setw(5) << global_migracao_ciclo << " (Ciclo) | " 
-                      << std::setw(8) << volume_migracao_total << " (Acumulada)" << std::endl;
-            
-            std::cout << "  Recursos:       " << std::fixed << std::setprecision(1) << std::setw(8) << global_recursos 
-                      << " (Total) | " << std::setprecision(2) << recursos_medios << " (Méd/Cel)" << std::endl;
-            
-            std::cout << "  Sustentabilidade: " 
-                      << (sustentavel ? "\033[1;32m[POSITIVA]\033[0m" : "\033[1;31m[NEGATIVA]\033[0m")
-                      << " (Reg: " << std::fixed << std::setprecision(1) << global_regeneracao 
-                      << " vs Cons: " << global_consumo << ")" << std::endl;
-            
-            std::cout << "\033[1;36m" << "└" << std::string(60, '-') << "┘\033[0m" << std::endl;
-        }
+        coletar_e_imprimir_metricas(rank, t, estacao_atual, agentes_locais, subgrid,
+                                    local_migracao, local_consumo, local_regeneracao,
+                                    local_mortes, local_nascimentos, volume_migracao_total);
 
         // 5.7 Barreira MPI por garantia de ciclo síncrono
         MPI_Barrier(MPI_COMM_WORLD);
@@ -365,5 +313,84 @@ void migrar_agentes_entre_processos(
     if (!recv_buffer_baixo.empty()) {
         // Recebe do vizinho de baixo e envia sua borda inferior para ele
         agentes_locais.insert(agentes_locais.end(), recv_buffer_baixo.begin(), recv_buffer_baixo.end());
+    }
+}
+
+void coletar_e_imprimir_metricas(
+    int rank, int t, Estacao estacao_atual,
+    const std::vector<Agente>& agentes_locais,
+    Territorio& subgrid,
+    int local_migracao, float local_consumo, float local_regeneracao,
+    int local_mortes, int local_nascimentos,
+    long long& volume_migracao_total)
+{
+    int local_num_agentes = (int)agentes_locais.size();
+    float local_recursos   = subgrid.get_recursos_totais();
+
+    // ── Otimização MPI: substituição de 9 Reduce individuais por 3 chamadas agrupadas ──
+    //
+    // Array com os 7 escalares cujo resultado final é uma SOMA entre processos.
+    // Índices:
+    //   [0] num_agentes   [1] recursos      [2] consumo
+    //   [3] regeneracao   [4] migracao      [5] mortes   [6] nascimentos
+    float buf_local[7] = {
+        (float)local_num_agentes,
+        local_recursos,
+        local_consumo,
+        local_regeneracao,
+        (float)local_migracao,
+        (float)local_mortes,
+        (float)local_nascimentos
+    };
+    float buf_global[7] = {};
+
+    // 1ª chamada: MPI_Allreduce (SUM) para todos os valores de soma.
+    // Todos os processos recebem o resultado (necessário para global_num_agentes).
+    MPI_Allreduce(buf_local, buf_global, 7, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+
+    int global_num_agentes    = (int)buf_global[0];
+    float global_recursos     = buf_global[1];
+    float global_consumo      = buf_global[2];
+    float global_regeneracao  = buf_global[3];
+    int global_migracao_ciclo = (int)buf_global[4];
+    int global_mortes         = (int)buf_global[5];
+    int global_nascimentos    = (int)buf_global[6];
+
+    // 2ª e 3ª chamadas: MAX e MIN de agentes por processo (não podem ser combinados
+    // com SUM nem entre si em um único MPI_Reduce sem uma struct customizada).
+    int global_max_agentes = 0;
+    int global_min_agentes = 0;
+    MPI_Reduce(&local_num_agentes, &global_max_agentes, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&local_num_agentes, &global_min_agentes, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
+
+    if (rank == 0) {
+        volume_migracao_total += global_migracao_ciclo;
+        float recursos_medios = global_recursos / (Config::LARGURA_GRID * Config::ALTURA_GRID);
+        bool sustentavel = global_regeneracao >= global_consumo;
+
+        std::cout << "\033[1;36m" << "┌" << std::string(60, '-') << "┐\033[0m" << std::endl;
+        std::cout << "\033[1;36m| CICLO " << std::setw(4) << t << " ["
+                  << (estacao_atual == Estacao::SECA ? "\033[1;33mSECA" : "\033[1;34mCHEIA") << "\033[1;36m]"
+                  << std::setw(34) << " |" << "\033[0m" << std::endl;
+        std::cout << "\033[1;36m" << "├" << std::string(60, '-') << "┤\033[0m" << std::endl;
+
+        std::cout << "  Agentes Totais: " << std::setw(6) << global_num_agentes
+                  << " | Min/Max por Proc: " << std::setw(4) << global_min_agentes << " / " << std::setw(4) << global_max_agentes << std::endl;
+
+        std::cout << "  Dinâmica:       " << "\033[1;32m+" << std::setw(3) << global_nascimentos << "\033[0m nascimentos, "
+                  << "\033[1;31m-" << std::setw(3) << global_mortes << "\033[0m mortes" << std::endl;
+
+        std::cout << "  Migração:       " << std::setw(5) << global_migracao_ciclo << " (Ciclo) | "
+                  << std::setw(8) << volume_migracao_total << " (Acumulada)" << std::endl;
+
+        std::cout << "  Recursos:       " << std::fixed << std::setprecision(1) << std::setw(8) << global_recursos
+                  << " (Total) | " << std::setprecision(2) << recursos_medios << " (Méd/Cel)" << std::endl;
+
+        std::cout << "  Sustentabilidade: "
+                  << (sustentavel ? "\033[1;32m[POSITIVA]\033[0m" : "\033[1;31m[NEGATIVA]\033[0m")
+                  << " (Reg: " << std::fixed << std::setprecision(1) << global_regeneracao
+                  << " vs Cons: " << global_consumo << ")" << std::endl;
+
+        std::cout << "\033[1;36m" << "└" << std::string(60, '-') << "┘\033[0m" << std::endl;
     }
 }
