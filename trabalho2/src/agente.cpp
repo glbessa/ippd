@@ -104,7 +104,7 @@ float Agente::consumir_recurso(Territorio& grid_local) {
         grid_local.registrar_consumo(Posicao(local_x, local_y), consumo_real);
         
         // Reabastece as energias do Agente - Eficiência reduzida
-        this->energia += consumo_real * 0.4f;
+        this->energia += consumo_real * EFICIENCIA_REABASTECIMENTO;
         
         return consumo_real;
     }
