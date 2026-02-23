@@ -13,7 +13,6 @@ Territorio::Territorio(int w, int h, Posicao offset_inicial)
 }
 
 // Funções determinísticas espaciais
-// Implementação exata depende da formulação do problema.
 TipoCelula Territorio::f_tipo(Posicao global) const {
     // Exemplo de mapeamento determinístico. Intercale ou utilize uma função hash sobre gx/gy.
     if ((global.x % Config::MODULO_ALDEIA == 0) && (global.y % Config::MODULO_ALDEIA == 0)) return TipoCelula::ALDEIA;
@@ -78,7 +77,6 @@ void Territorio::atualizar_acessibilidade(Estacao nova_estacao) {
 void Territorio::atualizar_recursos(Estacao estacao_atual) {
     float regeneracao_base = f_regeneracao(estacao_atual);
     
-    // Atualização de dados da área local. Essa rotina é computacionalmente intensiva?
     // Operações em array contíguo: ótimo uso de prefetching!
     #pragma omp parallel for schedule(static)
     for (int i = 0; i < (int)grid.size(); ++i) {
