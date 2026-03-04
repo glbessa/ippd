@@ -1,3 +1,8 @@
+
+Integrantes do grupo
+Gabriel Leite Bessa — responsável pela Tarefa A (Laço irregular e políticas de schedule).
+Yago Martins Pinto — responsável pela Tarefa D (Organização de região paralela).
+
 # Simulação Distribuída e Paralela de Mobilidade Territorial Sazonal (MPI + OpenMP)
 
 Implementação de uma simulação **multiagente** em um território 2D (grid) com **sazonalidade** (seca/cheia), explorando paralelismo **híbrido**:
