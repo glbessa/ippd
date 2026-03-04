@@ -1,7 +1,7 @@
 
-Integrantes do grupo
-Gabriel Leite Bessa — responsável pela Tarefa A (Laço irregular e políticas de schedule).
-Yago Martins Pinto — responsável pela Tarefa D (Organização de região paralela).
+# Integrantes do grupo
+#Gabriel Leite Bessa
+#Yago Martins Pinto 
 
 # Simulação Distribuída e Paralela de Mobilidade Territorial Sazonal (MPI + OpenMP)
 
