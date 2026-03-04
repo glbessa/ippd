@@ -1,7 +1,7 @@
 
 # Integrantes do grupo
-#Gabriel Leite Bessa
-#Yago Martins Pinto 
+# Gabriel Leite Bessa
+# Yago Martins Pinto 
 
 # Simulação Distribuída e Paralela de Mobilidade Territorial Sazonal (MPI + OpenMP)
 
